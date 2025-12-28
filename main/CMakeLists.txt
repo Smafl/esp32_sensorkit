@@ -9,8 +9,16 @@ endif()
 
 idf_component_register(
     SRCS "main.c"
-         "http_server/http_server.c"
          "wifi_manager/wifi_manager.c"
-    INCLUDE_DIRS "." "http_server" "wifi_manager"
+         "http_server/http_server.c"
+         "i2c_bus/i2c_bus.c"
+         "display/display.c"
+         "th_sensor/th_sensor.c"
+    INCLUDE_DIRS "."
+                 "wifi_manager"
+                 "http_server"
+                 "i2c_bus"
+                 "display"
+                 "th_sensor"
     PRIV_REQUIRES ${requires}
 )

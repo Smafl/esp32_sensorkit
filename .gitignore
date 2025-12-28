@@ -1,0 +1,18 @@
+# ESP-IDF build output
+/build/
+/sdkconfig
+/sdkconfig.old
+
+Kconfig.projbuild
+
+# Python
+__pycache__/
+*.pyc
+
+# Editor junk
+.vscode/
+.idea/
+
+# Components (vendor libs)
+components/*
+!components/.gitkeep

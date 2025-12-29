@@ -1,4 +1,4 @@
-set(requires esp-tls nvs_flash esp_netif esp_http_server esp_driver_i2c u8g2)
+set(requires esp-tls nvs_flash esp_netif esp_http_server esp_driver_i2c u8g2 esp_http_client)
 idf_build_get_property(target IDF_TARGET)
 
 if(${target} STREQUAL "linux")
@@ -20,5 +20,5 @@ idf_component_register(
                  "i2c_bus"
                  "display"
                  "th_sensor"
-    PRIV_REQUIRES ${requires}
+    PRIV_REQUIRES ${requires} json
 )

@@ -11,6 +11,11 @@ extern "C" {
  */
 void th_sensor_start_task(void);
 
+/**
+ * @brief Send temperature & humidity to a server
+ */
+void send_th_sensor_data(void);
+
 #ifdef __cplusplus
 }
 #endif

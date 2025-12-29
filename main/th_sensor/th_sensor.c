@@ -4,13 +4,66 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_log.h"
+#include "esp_http_client.h"
+#include "cJSON.h"
+#include "sdkconfig.h"
+
+#define STR_HELPER(x) #x
+#define STR(x) STR_HELPER(x)
+
+#define SERVER_URL "http://" CONFIG_SERVER_IP ":" STR(CONFIG_SERVER_PORT) "/th_sensor"
 
 static const char *TAG = "th_sensor";
 
 static float temperature = 0;
 static float humidity = 0;
 
-static void get_th_sensor_data(void) {
+
+void send_th_sensor_data(void)
+{
+    cJSON *json = cJSON_CreateObject();
+    cJSON_AddNumberToObject(json, "temperature", temperature);
+    cJSON_AddNumberToObject(json, "humidity", humidity);
+    cJSON_AddNumberToObject(json, "timestamp", (uint32_t)time(NULL));
+
+    char *payload = cJSON_PrintUnformatted(json);
+
+    /**
+     * NOTE: All the configuration parameters for http_client must be specified either in URL or as host and path parameters.
+     * If host and path parameters are not set, query parameter will be ignored. In such cases,
+     * query parameter should be specified in URL.
+     *
+     * If URL as well as host and path parameters are specified, values of host and path will be considered.
+     */
+    esp_http_client_config_t config = {
+        .url = SERVER_URL,
+        .method = HTTP_METHOD_POST,
+    };
+    ESP_LOGI(TAG, "HTTP request with url => %s", SERVER_URL);
+    esp_http_client_handle_t client = esp_http_client_init(&config);
+    esp_http_client_set_method(client, HTTP_METHOD_POST);
+    esp_http_client_set_header(client, "Content-Type", "application/json");
+    esp_http_client_set_post_field(client, payload, strlen(payload));
+
+    esp_err_t err = esp_http_client_perform(client);
+    if (err == ESP_OK) {
+        int status = esp_http_client_get_status_code(client);
+        if (status == 200 || status == 201) {
+            ESP_LOGI(TAG, "Data accepted by server");
+        } else {
+            ESP_LOGW(TAG, "Server responded with %d", status);
+        }
+    } else {
+        ESP_LOGE(TAG, "HTTP error: %s", esp_err_to_name(err));
+    }
+
+    esp_http_client_cleanup(client);
+    cJSON_Delete(json);
+    free(payload);
+}
+
+static void get_th_sensor_data(void)
+{
     uint8_t write_buf[] = {0xac, 0x33, 0x00};
     uint8_t read_buf[6];
     ESP_ERROR_CHECK(i2c_master_transmit(i2c_dev_th_sensor, write_buf, 3, 50));
@@ -26,16 +79,25 @@ static void get_th_sensor_data(void) {
     ESP_LOGI(TAG, "Temp: %.2f; Humid: %.2f", temperature, humidity);
 }
 
-static void th_sensor_update_task(void *pvParameters) {
+static void th_sensor_update_task(void *pvParameters)
+{
     while(1) {
         get_th_sensor_data();
         display_th_sensor_data(temperature, humidity);
+        send_th_sensor_data();
         vTaskDelay(pdMS_TO_TICKS(2000));
     }
 }
 
-void th_sensor_start_task(void) {
+void th_sensor_start_task(void)
+{
     BaseType_t xReturned;
-    xReturned = xTaskCreate(th_sensor_update_task, "th_sensor_update", 2048, NULL, tskIDLE_PRIORITY, NULL);
+    xReturned = xTaskCreate(th_sensor_update_task,
+                "th_sensor_update",
+                8192,
+                NULL,
+                tskIDLE_PRIORITY,
+                NULL
+                );
     (void)xReturned;
 }

@@ -1,6 +1,7 @@
 #pragma once
 #include "esp_err.h"
 #include "esp_http_server.h"
+#include "th_sensor.h"
 
 /**
  * @brief Start the HTTP server and register URI handlers

@@ -1,4 +1,5 @@
 #include "http_server.h"
+#include "th_sensor.h"
 #include "esp_log.h"
 
 #define TH_BUF_SIZE 256
@@ -32,12 +33,27 @@ static const httpd_uri_t hello = {
 };
 
 // th_sensor
+static esp_err_t th_sensor_get_handler(httpd_req_t *req)
+{
+    char buf[128];
+    snprintf(buf, sizeof(buf), "{\"temperature\":%.2f,\"humidity\":%.2f}", temperature, humidity);
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_send(req, buf, HTTPD_RESP_USE_STRLEN);
+    return ESP_OK;
+}
+
+static const httpd_uri_t th_sensor_get = {
+    .uri      = "/th_sensor",
+    .method   = HTTP_GET,
+    .handler  = th_sensor_get_handler,
+};
+
 static esp_err_t th_sensor_post_handler(httpd_req_t *req)
 {
     char buf[TH_BUF_SIZE];
     int ret = httpd_req_recv(req, buf, TH_BUF_SIZE);
     if (ret > 0) {
-        buf[ret] = '\0';  // null-terminate
+        buf[ret] = '\0';
         ESP_LOGI("TH_SENSOR", "Received: %s", buf);
     }
 
@@ -65,6 +81,7 @@ httpd_handle_t start_webserver(void)
         ESP_LOGI(TAG, "Registering URI handlers");
         httpd_register_uri_handler(server, &hello);
         httpd_register_uri_handler(server, &th_sensor);
+        httpd_register_uri_handler(server, &th_sensor_get);
         httpd_register_uri_handler(server, &favicon_uri);
         return server;
     }

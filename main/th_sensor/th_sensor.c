@@ -15,10 +15,16 @@
 
 static const char *TAG = "th_sensor";
 
-static float temperature = 0;
-static float humidity = 0;
+float temperature = 0;
+float humidity = 0;
 
-
+/**
+ * @brief Send the latest temperature and humidity data to a backend server.
+ *
+ * Creates a JSON payload containing `temperature`, `humidity`, and `timestamp`,
+ * then performs an HTTP POST request to the configured server URL.
+ * Logs success or error messages accordingly.
+ */
 void send_th_sensor_data(void)
 {
     cJSON *json = cJSON_CreateObject();
@@ -62,6 +68,13 @@ void send_th_sensor_data(void)
     free(payload);
 }
 
+/**
+ * @brief Read temperature and humidity data from the sensor over I2C.
+ *
+ * This function sends the measurement command to the sensor,
+ * reads raw data, converts it to physical values, and stores them
+ * in the static variables `temperature` and `humidity`.
+ */
 static void get_th_sensor_data(void)
 {
     uint8_t write_buf[] = {0xac, 0x33, 0x00};
@@ -79,6 +92,14 @@ static void get_th_sensor_data(void)
     ESP_LOGI(TAG, "Temp: %.2f; Humid: %.2f", temperature, humidity);
 }
 
+/**
+ * @brief FreeRTOS task that periodically reads sensor data, updates the display,
+ *        and sends the data to the server.
+ *
+ * The task loops indefinitely with a 2-second delay between iterations.
+ *
+ * @param pvParameters Not used.
+ */
 static void th_sensor_update_task(void *pvParameters)
 {
     while(1) {
@@ -89,6 +110,11 @@ static void th_sensor_update_task(void *pvParameters)
     }
 }
 
+/**
+ * @brief Create and start the FreeRTOS task that handles sensor updates.
+ *
+ * This function wraps the task creation and sets the stack size and priority.
+ */
 void th_sensor_start_task(void)
 {
     BaseType_t xReturned;

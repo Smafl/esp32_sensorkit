@@ -6,6 +6,9 @@
 extern "C" {
 #endif
 
+extern float temperature;
+extern float humidity;
+
 /**
  * @brief Start the temperature & humidity sensor update task
  */

@@ -7,7 +7,6 @@ This project demonstrates an ESP32 module running an HTTP server and interacting
 ## Resources
 #### ESP32 and HTTP server
 - [ESP-IDF Programming Guide](https://docs.espressif.com/projects/esp-idf/en/stable/esp32/index.html)
-- [HTTP Server](https://docs.espressif.com/projects/esp-idf/en/stable/esp32/api-reference/protocols/esp_http_server.html#_CPPv411httpd_startP14httpd_handle_tPK14httpd_config_t)
 
 #### Arduino Sensors
 - [ESP32 I2C OLED Display Example](https://github.com/VaseSimion/ESP32-U8G2Example?tab=readme-ov-file#esp32-i2c-oled-display-example)

@@ -8,6 +8,8 @@
 #include "i2c_bus/i2c_bus.h"
 #include "display/display.h"
 #include "th_sensor/th_sensor.h"
+#include "accelerometer/accelerometer.h"
+#include "tasks/tasks.h"
 
 static const char *TAG = "main";
 
@@ -36,6 +38,11 @@ void app_main(void)
     // Initialize OLED display
     ESP_LOGI(TAG, "Initializing display...");
     u8g2_display_init();
+
+    // Start accelerometer sensor task
+    ESP_LOGI(TAG, "Get accelerometer data...");
+    accelerometer_sensor_init();
+    accelerometer_start_task();
 
     // Start temperature & humidity sensor task
     ESP_LOGI(TAG, "Starting TH sensor task...");

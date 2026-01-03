@@ -14,11 +14,15 @@ idf_component_register(
          "i2c_bus/i2c_bus.c"
          "display/display.c"
          "th_sensor/th_sensor.c"
+         "accelerometer/accelerometer.c"
+         "tasks/tasks.c"
     INCLUDE_DIRS "."
                  "wifi_manager"
                  "http_server"
                  "i2c_bus"
                  "display"
                  "th_sensor"
+                 "accelerometer"
+                 "tasks"
     PRIV_REQUIRES ${requires} json
 )

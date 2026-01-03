@@ -1,7 +1,7 @@
-#include "display.h"
-#include "i2c_bus/i2c_bus.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "display.h"
+#include "i2c_bus/i2c_bus.h"
 
 // static const char *TAG = "display";
 

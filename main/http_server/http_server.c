@@ -36,7 +36,7 @@ static const httpd_uri_t hello = {
 static esp_err_t th_sensor_get_handler(httpd_req_t *req)
 {
     char buf[128];
-    snprintf(buf, sizeof(buf), "{\"temperature\":%.2f,\"humidity\":%.2f}", temperature, humidity);
+    snprintf(buf, sizeof(buf), "{\"temperature\":%.1f,\"humidity\":%.1f}", temperature, humidity);
     httpd_resp_set_type(req, "application/json");
     httpd_resp_send(req, buf, HTTPD_RESP_USE_STRLEN);
     return ESP_OK;
@@ -54,20 +54,20 @@ static esp_err_t th_sensor_post_handler(httpd_req_t *req)
     int ret = httpd_req_recv(req, buf, TH_BUF_SIZE);
     if (ret > 0) {
         buf[ret] = '\0';
-        ESP_LOGI("TH_SENSOR", "Received: %s", buf);
+        ESP_LOGI(TAG, "Received: %s", buf);
     }
 
     httpd_resp_send(req, "OK", HTTPD_RESP_USE_STRLEN);
     return ESP_OK;
 }
 
-static const httpd_uri_t th_sensor = {
+static const httpd_uri_t th_sensor_post = {
     .uri      = "/th_sensor",
     .method   = HTTP_POST,
     .handler  = th_sensor_post_handler,
 };
 
-// server
+// Server
 httpd_handle_t start_webserver(void)
 {
     httpd_handle_t server = NULL;
@@ -80,7 +80,7 @@ httpd_handle_t start_webserver(void)
     if (httpd_start(&server, &config) == ESP_OK) {
         ESP_LOGI(TAG, "Registering URI handlers");
         httpd_register_uri_handler(server, &hello);
-        httpd_register_uri_handler(server, &th_sensor);
+        httpd_register_uri_handler(server, &th_sensor_post);
         httpd_register_uri_handler(server, &th_sensor_get);
         httpd_register_uri_handler(server, &favicon_uri);
         return server;

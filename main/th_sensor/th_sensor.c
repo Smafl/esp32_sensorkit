@@ -1,8 +1,9 @@
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "freertos/semphr.h"
 #include "th_sensor.h"
 #include "i2c_bus/i2c_bus.h"
 #include "display/display.h"
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
 #include "esp_log.h"
 #include "esp_http_client.h"
 #include "cJSON.h"
@@ -19,7 +20,7 @@ float temperature = 0;
 float humidity = 0;
 
 /**
- * @brief Send the latest temperature and humidity data to a backend server.
+ * @brief Send the latest temperature and humidity data to a server.
  *
  * Creates a JSON payload containing `temperature`, `humidity`, and `timestamp`,
  * then performs an HTTP POST request to the configured server URL.
@@ -75,21 +76,22 @@ void send_th_sensor_data(void)
  * reads raw data, converts it to physical values, and stores them
  * in the static variables `temperature` and `humidity`.
  */
-static void get_th_sensor_data(void)
+void get_th_sensor_data(void)
 {
+    // 0xAC → trigger measurement; 0x33 → command parameter; 0x00 → command parameter
     uint8_t write_buf[] = {0xac, 0x33, 0x00};
     uint8_t read_buf[6];
     ESP_ERROR_CHECK(i2c_master_transmit(i2c_dev_th_sensor, write_buf, 3, 50));
     vTaskDelay(pdMS_TO_TICKS(10));
     ESP_ERROR_CHECK(i2c_master_receive(i2c_dev_th_sensor, read_buf, 6, 50));
 
-    uint32_t hum = (read_buf[1] << 16 | read_buf[2] << 8 | read_buf[3]) >> 4;
-    uint32_t temp = (read_buf[3] << 16 | read_buf[4] << 8 | read_buf[5]) & 0xfffff;
+    uint32_t hum_raw = (read_buf[1] << 16 | read_buf[2] << 8 | read_buf[3]) >> 4;
+    uint32_t temp_raw = (read_buf[3] << 16 | read_buf[4] << 8 | read_buf[5]) & 0xfffff;
 
-    temperature = temp * 200.0 / (1024*1024) - 50;
-    humidity = hum * 100.0 / (1024*1024);
+    temperature = temp_raw * 200.0 / (1024*1024) - 50;
+    humidity = hum_raw * 100.0 / (1024*1024);
 
-    ESP_LOGI(TAG, "Temp: %.2f; Humid: %.2f", temperature, humidity);
+    ESP_LOGI(TAG, "Temp: %.1f; Humid: %.1f", temperature, humidity);
 }
 
 /**
@@ -100,30 +102,19 @@ static void get_th_sensor_data(void)
  *
  * @param pvParameters Not used.
  */
-static void th_sensor_update_task(void *pvParameters)
+void th_sensor_update_task(void *pvParameters)
 {
+    if (!i2c_mutex) {
+        ESP_LOGE(TAG, "i2c_mutex not initialized");
+        vTaskDelete(NULL);
+    }
+
     while(1) {
+        xSemaphoreTake(i2c_mutex, portMAX_DELAY);
         get_th_sensor_data();
         display_th_sensor_data(temperature, humidity);
+        xSemaphoreGive(i2c_mutex);
         send_th_sensor_data();
         vTaskDelay(pdMS_TO_TICKS(2000));
     }
-}
-
-/**
- * @brief Create and start the FreeRTOS task that handles sensor updates.
- *
- * This function wraps the task creation and sets the stack size and priority.
- */
-void th_sensor_start_task(void)
-{
-    BaseType_t xReturned;
-    xReturned = xTaskCreate(th_sensor_update_task,
-                "th_sensor_update",
-                8192,
-                NULL,
-                tskIDLE_PRIORITY,
-                NULL
-                );
-    (void)xReturned;
 }

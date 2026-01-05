@@ -13,9 +13,6 @@ SemaphoreHandle_t i2c_mutex = NULL;
 #define I2C_MASTER_SDA_IO           CONFIG_I2C_MASTER_SDA       /*!< GPIO number used for I2C master data  */
 #define I2C_MASTER_NUM              I2C_NUM_0                   /*!< I2C port number for master dev */
 #define I2C_MASTER_FREQ_HZ          CONFIG_I2C_MASTER_FREQUENCY /*!< I2C master clock frequency */
-#define I2C_MASTER_TX_BUF_DISABLE   0                           /*!< I2C master doesn't need buffer */
-#define I2C_MASTER_RX_BUF_DISABLE   0                           /*!< I2C master doesn't need buffer */
-#define I2C_MASTER_TIMEOUT_MS       1000
 
 i2c_master_bus_handle_t i2c_bus = NULL;
 i2c_master_dev_handle_t i2c_dev_th_sensor = NULL; // temparature and humidity sensor
@@ -24,7 +21,6 @@ i2c_master_dev_handle_t i2c_dev_accelerometer = NULL; // LIS3DH
 
 void i2c_master_init(void)
 {
-
     i2c_mutex = xSemaphoreCreateMutex();
     if( i2c_mutex == NULL )
     {
@@ -88,7 +84,7 @@ void i2c_master_init(void)
     ESP_ERROR_CHECK(i2c_master_bus_add_device(i2c_bus, &dev_config_accelerometer, &i2c_dev_accelerometer));
 }
 
-// I (2148) i2c_bus: Found device 19 - accelerometer
-// I (2158) i2c_bus: Found device 38 - th_sensor
-// I (2158) i2c_bus: Found device 3c - display
-// I (2168) i2c_bus: Found device 77
+// i2c_bus: Found device 19 - accelerometer
+// i2c_bus: Found device 38 - th_sensor
+// i2c_bus: Found device 3c - display
+// i2c_bus: Found device 77 - air pressure

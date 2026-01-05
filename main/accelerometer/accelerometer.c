@@ -7,8 +7,41 @@
 
 static const char *TAG = "accelerometer";
 
-#define LIS3DH_REG_CTRL4   0x23
-#define LIS3DH_REG_OUT_X_L 0x28
+#define LIS3DH_REG_CTRL1            0x20
+#define LIS3DH_REG_CTRL2            0x21
+#define LIS3DH_REG_CTRL4            0x23
+#define LIS3DH_REG_OUT_X_L          0x28
+
+#define LIS3DY_HPCLICK              (1 << 2)
+#define LIS3DH_CLICK_CFG            0x38
+#define LIS3DH_CLICK_THS            0x3a
+#define LIS3DH_CLICK_THS_LIR_CLICK  (1 << 7)
+#define LIS3DH_CLICK_SRC            0x39
+
+#define LIS3DH_CLICK_CFG_XS         (1 << 0)
+#define LIS3DH_CLICK_CFG_XD         (1 << 1)
+#define LIS3DH_CLICK_CFG_YS         (1 << 2)
+#define LIS3DH_CLICK_CFG_YD         (1 << 3)
+#define LIS3DH_CLICK_CFG_ZS         (1 << 4)
+#define LIS3DH_CLICK_CFG_ZD         (1 << 5)
+
+#define CLICK_IA                    (1 << 6)
+#define CLICK_DCLICK                (1 << 5)
+#define CLICK_SCLICK                (1 << 4)
+
+#define LIS3DH_X_ENABLE             (1 << 0)
+#define LIS3DH_Y_ENABLE             (1 << 1)
+#define LIS3DH_Z_ENABLE             (1 << 2)
+
+#define LIS3DH_ODR0                 (1 << 4)
+#define LIS3DH_ODR1                 (1 << 5)
+#define LIS3DH_ODR2                 (1 << 6)
+#define LIS3DH_ODR3                 (1 << 7)
+#define LIS3DH_ODR_100HZ            (LIS3DH_ODR2 | LIS3DH_ODR0)
+
+#define LIS3DH_TIME_LIMIT           0x3b
+#define LIS3DH_TIME_LATENCY         0x3c
+#define LIS3DH_TIME_WINDOW          0x3d
 
 float x_g = 0;
 float y_g = 0;
@@ -46,14 +79,21 @@ static esp_err_t lis3dh_read(uint8_t reg, uint8_t *data, size_t len)
 void get_accelerometer_data(void)
 {
     uint8_t ctrl4;
+
+    /*
+    Reads the CTRL4 register of the LIS3DH. This register stores:
+    - The full-scale range (±2g, ±4g, ±8g, ±16g)
+    - Whether high-resolution mode is enabled.
+    */
     if (lis3dh_read(LIS3DH_REG_CTRL4, &ctrl4, 1) != ESP_OK) {
         ESP_LOGE(TAG, "Failed to read CTRL_REG4");
         return;
     }
 
-    uint8_t range_bits = (ctrl4 >> 4) & 0x03; // FS1:FS0
-    uint8_t hr_bit = (ctrl4 >> 3) & 0x01; // HR
+    uint8_t range_bits = (ctrl4 >> 4) & 0x03; // Determine measurement range
+    uint8_t hr_bit = (ctrl4 >> 3) & 0x01; // Bit 3 of CTRL4, indicates high-resolution mode
 
+    // Maps the 2-bit range_bits to the actual physical acceleration range in g
     float range_g;
     switch(range_bits) {
         case 0: range_g = 2; break;   // ±2g
@@ -71,19 +111,37 @@ void get_accelerometer_data(void)
         return;
     }
 
+    // Combines low and high bytes into a signed 16-bit integer
     int16_t x_raw = (int16_t)(raw[0] | (raw[1] << 8));
     int16_t y_raw = (int16_t)(raw[2] | (raw[3] << 8));
     int16_t z_raw = (int16_t)(raw[4] | (raw[5] << 8));
 
+    // ESP_LOGI(TAG, "Z: %hd g, range = %hhu, hr = %hhu", z_raw, range_bits, hr_bit);
+
+    // Converts raw integer values to acceleration in g
     if (bits == 12) {
-        x_g = (float)x_raw * range_g / 2048.0f;
-        y_g = (float)y_raw * range_g / 2048.0f;
-        z_g = (float)z_raw * range_g / 2048.0f;
+        x_g = (float)x_raw * range_g / 32000.0f / 4.0f;
+        y_g = (float)y_raw * range_g / 32000.0f / 4.0f;
+        z_g = (float)z_raw * range_g / 32000.0f / 4.0f;
     } else {
-        x_g = (float)x_raw * range_g / 512.0f;
-        y_g = (float)y_raw * range_g / 512.0f;
-        z_g = (float)z_raw * range_g / 512.0f;
+        x_g = (float)x_raw * range_g / 32000.0f;
+        y_g = (float)y_raw * range_g / 32000.0f;
+        z_g = (float)z_raw * range_g / 32000.0f;
     }
+
+    uint8_t click_src;
+    if (lis3dh_read(LIS3DH_CLICK_SRC, &click_src, 1) != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to read CLICK_SRC");
+        return;
+    }
+    // ESP_LOGI(TAG, "REG %02hhx", click_src);
+
+    if (click_src & CLICK_DCLICK) {
+        ESP_LOGI(TAG, "DOUBLE click");
+    }
+    // } else if (click_src & CLICK_SCLICK) {
+    //     ESP_LOGI(TAG, "SINGLE click");
+    // }
 }
 
 /**
@@ -105,18 +163,73 @@ void accelerometer_update_task(void *pvParameters)
         get_accelerometer_data();
         xSemaphoreGive(i2c_mutex);
         ESP_LOGI(TAG, "X: %.2f g, Y: %.2f g, Z: %.2f g", x_g, y_g, z_g);
-        vTaskDelay(pdMS_TO_TICKS(2000));
+        vTaskDelay(pdMS_TO_TICKS(1000));
     }
 }
 
 /**
  * @brief Initialize the LIS3DH accelerometer.
  *
- * Powers on the device, enables X/Y/Z axes, and sets default data rate.
+ * Powers on the device and set up configurations
  */
 void accelerometer_sensor_init(void)
 {
-	// Power ON and enable X/Y/Z axes
-	uint8_t write_buf[] = {0x20, 0x57};
-	i2c_master_transmit(i2c_dev_accelerometer, write_buf, 2, 50);
+	{
+        // Power ON and enable X/Y/Z axes
+        uint8_t write_buf[] = {LIS3DH_REG_CTRL1, LIS3DH_ODR_100HZ | LIS3DH_X_ENABLE | LIS3DH_Y_ENABLE | LIS3DH_Z_ENABLE};
+        i2c_master_transmit(i2c_dev_accelerometer, write_buf, 2, 50);
+    }
+
+	{
+        // High-pass filter enabled for CLICK function
+        uint8_t write_buf[] = {LIS3DH_REG_CTRL2, LIS3DY_HPCLICK};
+        i2c_master_transmit(i2c_dev_accelerometer, write_buf, 2, 50);
+    }
+
+    // {
+    // Enable HPCLICK with safe read-modify-write
+    // uint8_t reg2;
+    // lis3dh_read(LIS3DH_REG_CTRL2, &reg2, 1);
+    // reg2 |= LIS3DY_HPCLICK;         // bit 2
+    // reg2 &= ~((1 << 7) | (1 << 6)); // HPM1:HPM0 = 00
+    // i2c_master_transmit(i2c_dev_accelerometer, &reg2, 1, 50);
+    // }
+
+    {
+        // Double click
+        uint8_t write_buf[] = {LIS3DH_CLICK_CFG, LIS3DH_CLICK_CFG_ZD};
+	    i2c_master_transmit(i2c_dev_accelerometer, write_buf, 2, 50);
+    }
+
+    // {
+    //     // Single and double click
+    //     uint8_t write_buf[] = {LIS3DH_CLICK_CFG,
+    //         LIS3DH_CLICK_CFG_XD | LIS3DH_CLICK_CFG_YD | LIS3DH_CLICK_CFG_ZD |
+    //         LIS3DH_CLICK_CFG_XS | LIS3DH_CLICK_CFG_YS | LIS3DH_CLICK_CFG_ZS};
+    //     i2c_master_transmit(i2c_dev_accelerometer, write_buf, 2, 50);
+    // }
+
+    {
+        // Click threshold
+        uint8_t write_buf[] = {LIS3DH_CLICK_THS, 20 | LIS3DH_CLICK_THS_LIR_CLICK};
+	    i2c_master_transmit(i2c_dev_accelerometer, write_buf, 2, 50);
+    }
+
+    {
+        // Time limit
+        uint8_t write_buf[] = {LIS3DH_TIME_LIMIT, 10};
+	    i2c_master_transmit(i2c_dev_accelerometer, write_buf, 2, 50);
+    }
+
+    {
+        // Time latency
+        uint8_t write_buf[] = {LIS3DH_TIME_LATENCY, 20};
+	    i2c_master_transmit(i2c_dev_accelerometer, write_buf, 2, 50);
+    }
+
+    {
+        // Time window
+        uint8_t write_buf[] = {LIS3DH_TIME_WINDOW, 40};
+	    i2c_master_transmit(i2c_dev_accelerometer, write_buf, 2, 50);
+    }
 }
